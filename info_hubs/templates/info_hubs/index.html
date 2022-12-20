@@ -1,0 +1,18 @@
+{% extends "info_hubs/base.html" %}
+
+{% block header %}
+  <div class='jumbotron'>
+    <h3>Information Hub</h3>
+    <br>
+    <h4>
+      Information hub lets you see news related to your interests
+    </h4>
+  </div>
+{% endblock header %}
+
+{% block content %}
+  <h4>
+    <a href="{% url 'users:register' %}">Register an account</a>
+    for a more personalized news feed
+  </h4>
+{% endblock content %}

@@ -1,0 +1,25 @@
+{% extends 'info_hubs/base.html' %}
+
+{% block header %}
+  <h2>{{ category }}</h2>
+{% endblock header %}
+
+{% block content %}
+  {% for article in articles %}
+      <div class="panel panel-default">
+        <div class="panel-heading">
+        <h3>
+          {{ article.headline }}
+        </h3>
+        <a href="{{ article.image }}"></a>
+      </div>
+      <div class="panel-body">
+        {{ article|safe }}
+      </div>
+    </div> <!-- panel -->
+
+    {% empty %}
+      There are no entries for this topic yet.
+    {% endfor %}
+
+{% endblock content %}

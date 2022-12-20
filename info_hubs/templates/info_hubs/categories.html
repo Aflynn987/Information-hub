@@ -1,0 +1,20 @@
+{% extends "info_hubs/base.html" %}
+
+{% block content %}
+
+  <p>Categories</p>
+
+  <div>
+    {% for category in categories %}
+      <a style="display: block; background-color: lightgrey; border-radius: 5px;
+       margin: 10px; padding: 10px; text-align: center; width: 200px;
+        color: black; text-decoration: none;"
+         href="{% url 'info_hubs:category' category.id %}">
+        {{ category }}
+      </a>
+    {% empty %}
+      <div>No categories have been added yet.</div>
+    {% endfor %}
+  </div>
+
+{% endblock content %}
