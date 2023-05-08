@@ -23,7 +23,7 @@ class ArticleTestCase(TestCase):
             category=self.category,
             text='The Science of Music'
         )
-
+B
     def test_article_creation(self):
         self.assertTrue(isinstance(self.article, Article))
         self.assertEqual(str(self.article), 'The Science of Music')
