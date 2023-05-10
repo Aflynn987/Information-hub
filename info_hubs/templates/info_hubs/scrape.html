@@ -1,0 +1,27 @@
+{% extends "info_hubs/base.html" %}
+
+{% block content %}
+
+  <p>Scraping page</p>
+
+  <div>
+    {% for category in categories %}
+      <a style="display: block; background-color: lightgrey; border-radius: 5px;
+       margin: 10px; padding: 10px; text-align: center; width: 200px;
+        color: black; text-decoration: none;"
+         href="{% url 'info_hubs:category' category.id %}">
+        {{ category }}
+      </a>
+    {% empty %}
+      <div>No categories have been added yet.</div>
+    {% endfor %}
+  </div>
+
+  <hr>
+  <h1>Scrape</h1>
+  <form method="post" action="{% url 'info_hubs:scrape_data' %}">
+    {% csrf_token %}
+    <button type="submit">Scrape RTE Business News</button>
+  </form>
+
+{% endblock content %}

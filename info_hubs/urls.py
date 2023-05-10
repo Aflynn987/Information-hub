@@ -16,4 +16,7 @@ urlpatterns = [
     # Detail page for a single topic
     # Show articles for each topic
     re_path('^categories/(?P<category_id>\d+)/$', views.category, name='category'),
+
+    # Web Scraping page (admin only)
+    re_path('scrape/', views.scrape_data, name='scrape_data')
 ]
