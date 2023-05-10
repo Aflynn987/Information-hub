@@ -39,7 +39,7 @@ class ArticleTestCase(TestCase):
         self.assertEqual(self.article.split('The Science of Music', ' '), ['The', 'Science', 'of', 'Music'])
 
 
-# Tests for info_hubs models
+# Tests for info_hubs views
 class InfoHubViewsTestCase(TestCase):
     def setUp(self):
         self.client = Client()
@@ -72,3 +72,27 @@ class InfoHubViewsTestCase(TestCase):
 
         self.assertEqual(headline.text, 'headline\n')
         self.assertEqual(image['src'], '/media/image.jpg/')
+
+# Tests for webscraping view method
+class ScrapeDataViewTestCase(TestCase):
+
+    def setUp(self):
+        self.client = Client()
+        self.url = 'https://www.rte.ie/news/business/2023/0510/1382716-retailers/'
+        self.response = self.client.post(reverse('info_hubs:scrape_data'), {'url': self.url})
+
+    def test_post_request_creates_article(self):
+        article = Article.objects.get(category__text='business')
+        self.assertEqual(article.category.text, 'business')
+
+    def test_post_request_redirects_to_success_page(self):
+        self.assertEqual(self.response.status_code, 302)
+        self.assertRedirects(self.response, f"{reverse('info_hubs:scrape_data')}?success=true")
+
+    def test_get_request_returns_scrape_template(self):
+        response = self.client.get(reverse('info_hubs:scrape_data'))
+        self.assertTemplateUsed(response, 'info_hubs/scrape.html')
+
+    def test_get_request_success_param(self):
+        response = self.client.get(reverse('info_hubs:scrape_data'), {'success': 'true'})
+        self.assertContains(response, 'Scraping complete!')
