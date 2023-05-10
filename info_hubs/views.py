@@ -1,5 +1,7 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import HttpResponse
+from django.urls import reverse
+from urllib.parse import urlparse, urlencode
 import requests
 from bs4 import BeautifulSoup
 from .models import Article, Category
@@ -39,7 +41,7 @@ def category(request, category_id):
 def scrape_data(request):
     if request.method == 'POST':
         # URL of the news article to scrape
-        url = 'https://www.rte.ie/news/business/2023/0510/1382716-retailers/'
+        url = request.POST.get('url')
 
         # Make a GET request to the URL and store the response
         response = requests.get(url)
@@ -64,21 +66,24 @@ def scrape_data(request):
 
         # Extract the article link, author, and site
         link = f'<a href="{url}">{url}</a>'
-        author = soup.find('span', itemprop='name').text.strip()
+        author_element = soup.find('span', itemprop='name')
+        author = author_element.text.strip() if author_element else 'N/a'
         site = 'RTE'
 
         # Construct the output string
         output_string = f'<h3>{title}</h3> {image_tag} <p> {article_text}... </p> <br> <p> Link: {link} </p> <p> Author: {author} </p> <p> Site: {site} </p>'
 
-        # Create an instance of the Article model and category for the article
-        article = Article()
-        category = Category.objects.filter(text='Business').first()
+        # Parse the category from the url
+        path = urlparse(url).path
+        categories = list(Category.objects.order_by('date_added'))
+        category = next((cat for cat in categories if cat.text.lower() in path.lower()), None)
 
-        # If a Category object does not exist for "Business", create one
+        # If a Category object does not exist, create one using the actual path
         if not category:
-            category = Category.objects.create(text='Business')
+            new_category = path.split('/')[2]  # Extract the third part of the path as the category
+            category = Category.objects.create(text=new_category)
 
-        # Create an Article object with the "Business" category and article text
+        # Create an Article object with the category and article text
         article = Article.objects.create(
             category=category,
             text=output_string
@@ -88,8 +93,9 @@ def scrape_data(request):
         article.save()
 
         # Return a success message
-        return HttpResponse('Scraping complete')
+        return redirect(reverse('info_hubs:scrape_data') + '?' + urlencode({'success': 'true'}))
 
     else:
-        # If the form has not been submitted, just render the template
-        return render(request, 'info_hubs/scrape.html')
+        success = request.GET.get('success')
+        context = {'success': success}
+        return render(request, 'info_hubs/scrape.html', context=context)
