@@ -41,6 +41,9 @@ INSTALLED_APPS = [
     # Styling
     'bootstrap3',
 
+    # Modules
+    'requests',
+
     # My apps
     'info_hubs',
     'users',

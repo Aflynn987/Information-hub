@@ -1,0 +1,21 @@
+{% extends "info_hubs/base.html" %}
+
+{% block content %}
+
+  <p>Scraping page</p>
+  <hr>
+  <h1>Scrape</h1>
+  <form method="post" action="{% url 'info_hubs:scrape_data' %}">
+    {% csrf_token %}
+    <label for="url">Enter the URL to scrape:</label>
+    <input type="text" id="url" name="url">
+    <button type="submit">Scrape</button>
+  </form>
+
+  {% if success %}
+    <div style="background-color: lightgreen; color: white; padding: 10px; margin-top: 10px;">
+      Scraping complete!
+    </div>
+  {% endif %}
+
+{% endblock content %}
