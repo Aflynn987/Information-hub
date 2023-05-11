@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect
-from django.http import HttpResponse
 from django.urls import reverse
 from urllib.parse import urlparse, urlencode
 import requests
+from mrq.task import task
 from django.shortcuts import render
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
@@ -43,11 +43,8 @@ def category(request, category_id):
     context = {'category': category, 'articles': articles}
     return render(request, 'info_hubs/category.html', context)
 
-def scrape_data(request):
-    if request.method == 'POST':
-        # URL of the news article to scrape
-        url = request.POST.get('url')
-
+@task
+def scrape_data(url):
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
 
