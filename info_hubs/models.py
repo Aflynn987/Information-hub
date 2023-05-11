@@ -20,7 +20,7 @@ class Article(models.Model):
     """The information related to an article"""
     category = models.ForeignKey(
         Category,
-        on_delete=models.DO_NOTHING
+        on_delete=models.CASCADE
     )
     text = models.TextField()
     date_added = models.DateTimeField(auto_now_add=True)
