@@ -43,6 +43,7 @@ INSTALLED_APPS = [
 
     # Modules
     'requests',
+    'mrq',
 
     # My apps
     'info_hubs',
