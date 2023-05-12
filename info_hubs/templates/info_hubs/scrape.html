@@ -7,8 +7,18 @@
   <h1>Scrape</h1>
   <form method="post" action="{% url 'info_hubs:scrape_data' %}">
     {% csrf_token %}
-    <label for="url">Enter the URL to scrape:</label>
-    <input type="text" id="url" name="url">
+    <div>
+      <label><input type="checkbox" name="urls[]" value="https://www.rte.ie/">URL 1 - RTE</label>
+    </div>
+    <div>
+      <label><input type="checkbox" name="urls[]" value="https://www.theguardian.com">URL 2 - The Guardian</label>
+    </div>
+    <div>
+      <label><input type="checkbox" name="urls[]" value="https://www.theamericanconservative.com/">URL 3 - The American Conservative</label>
+    </div>
+    <div>
+      <label><input type="checkbox" name="urls[]" value="https://www.dailykos.com/">URL 4 - Daily Kos</label>
+    </div>
     <button type="submit">Scrape</button>
   </form>
 
