@@ -1,6 +1,6 @@
 import requests
 
-url = "https://www.theguardian.com/media/2023/may/11/cnn-chris-licht-trump-town-hall"
+url = "https://www.theguardian.com/uk/commentisfree"
 response = requests.get(url)
 if response.status_code == 200:
     print(response.text)
