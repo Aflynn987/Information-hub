@@ -6,6 +6,7 @@ import requests
 from django.shortcuts import render
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+import tldextract
 from .models import Article, Category
 
 
@@ -47,24 +48,29 @@ def scrape_data(request):
     if request.method == 'POST':
         # URL of the news article to scrape
         url = request.POST.get('url')
+        domain_name = tldextract.extract(url).domain
 
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
 
-        maincontent_div = soup.find('div', {'id': 'primary-nav-global'})
-        cat_params = ['news', 'sport', 'entertainment', 'business', 'lifestyle', 'culture']
+        if domain_name == 'rte':
+            maincontent_div = soup.find('div', {'id': 'primary-nav-global'})
+            cat_params = ['news', 'sport', 'entertainment', 'business', 'lifestyle', 'culture']
+        elif domain_name == 'theguardian':
+            maincontent_div = soup.find('ul', {'class': 'pillars'})
+            cat_params = ['international', 'commentisfree', 'sport', 'culture',
+                          'lifeandstyle']  # The guardian cat_params aren't needed but the rte ones are
 
-        if maincontent_div:
-            links = maincontent_div.find_all('a')
-            urls = []
-            for link in links:
-                href = link.get('href')
-                full_url = urljoin(url, href)
-                if full_url not in urls and any(cat in href.lower() for cat in cat_params):
-                    urls.append(full_url)
+        links = maincontent_div.find_all('a')
+        urls = []
+        for link in links:
+            href = link.get('href')
+            full_url = urljoin(url, href)
+            if full_url not in urls and any(cat in href.lower() for cat in cat_params):
+                urls.append(full_url)
 
-            for url in urls:
-                scrape_category(url)
+        for url in urls:
+            scrape_category(url, domain_name)
 
         # Return a success message
         return redirect(reverse('info_hubs:scrape_data') + '?' + urlencode({'success': 'true'}))
@@ -74,7 +80,7 @@ def scrape_data(request):
         context = {'success': success}
         return render(request, 'info_hubs/scrape.html', context=context)
 
-def scrape_category(url):
+def scrape_category(url, domain_name):
     # Make a GET request to the URL and store the response
     response = requests.get(url)
 
@@ -82,7 +88,16 @@ def scrape_category(url):
     soup = BeautifulSoup(response.content, 'html.parser')
 
     # Extract the article title
-    maincontent_div = soup.find('div', {'id': 'maincontent'})
+    maincontent_div = None
+    if domain_name == 'rte':
+        maincontent_div = soup.find('div', {'id': 'maincontent'})
+    elif domain_name == 'theguardian':
+        data_titles = ['Headlines', 'Sport', 'Culture', 'Lifestyle', 'Opinion']
+        for title in data_titles:
+            maincontent_div = soup.find('div', {'data-title': title})
+            if maincontent_div:
+                # category = 'News' if title == 'Headlines' else title
+                break
 
     # Gather the list of articles for the given category
     if maincontent_div:
@@ -90,58 +105,130 @@ def scrape_category(url):
         urls = []
         for link in links:
             href = link.get('href')
-            # if '/news/business/' in href:
             full_url = urljoin(url, href)
             if full_url not in urls:
                 urls.append(full_url)
 
         for url in urls[:4]:
+            domain_name_validation = tldextract.extract(url).domain
+            if domain_name != domain_name_validation:
+                break
             # Make a GET request to the URL and store the response
-            scrape_article(url)
-def scrape_article(url):
+            scrape_article(url, domain_name)
+
+
+def scrape_article(url, domain_name):
     # Make a GET request to the URL and store the response
     response = requests.get(url)
-
     # Parse the HTML content of the response with BeautifulSoup
     soup = BeautifulSoup(response.content, 'html.parser')
 
-    # Extract the article title
-    title = soup.find('h1', class_='headline').text.strip()
+    title = 'N/a'
+    if domain_name == 'rte':
+        # Extract the article title
+        title = soup.find('h1', class_='headline').text.strip()
+        # Extract the article image URL (if one exists)
+        image = soup.find('div', class_='article_image')
+        if image:
+            image_url = image.find('img')['src']
+            image_tag = f'<a href="{image_url}"><img src="{image_url}" /></a>'
+        else:
+            image_tag = ''
+        # Extract the article text and limit to 100 characters
+        article_body = soup.find('section', class_='medium-10 medium-offset-1 columns article-body')
+        if article_body:
+            article_text = article_body.find_all('p')[0].text.strip()[:200]
+        else:
+            article_text = 'N/a'
 
-    # Extract the article image URL (if one exists)
-    image = soup.find('div', class_='article_image')
-    if image:
-        image_url = image.find('img')['src']
-        image_tag = f'<a href="{image_url}"><img src="{image_url}" /></a>'
-    else:
-        image_tag = ''
+        # Extract the article link, author, and site
+        link = f'<a href="{url}">{url}</a>'
+        author_element = soup.find('span', itemprop='name')
+        author = author_element.text.strip() if author_element else 'N/a'
+        site = 'RTE'
 
-    # Extract the article text and limit to 100 characters
-    article_body = soup.find('section', class_='medium-10 medium-offset-1 columns article-body')
-    if article_body:
-        article_text = article_body.find_all('p')[0].text.strip()[:200]
-    else:
-        article_text = 'N/a'
+    elif domain_name == 'theguardian':
+        # Extract the article title
+        # title = soup.find('div', {'data-gu-name': 'headline'}).find('h1').text.strip()
+        headline_div = soup.find('div', {'data-gu-name': 'headline'})
+        if headline_div:
+            title_element = headline_div.find('h1')
+            if title_element:
+                title = headline_div.find('h1').text.strip()
 
-    # Extract the article link, author, and site
-    link = f'<a href="{url}">{url}</a>'
-    author_element = soup.find('span', itemprop='name')
-    author = author_element.text.strip() if author_element else 'N/a'
-    site = 'RTE'
+        # Extract the article image URL (if one exists)
+        image = soup.find('div', class_='article_image')
+        if image:
+            image_url = image.find('img')['src']
+            image_tag = f'<a href="{image_url}"><img src="{image_url}" /></a>'
+        else:
+            image_tag = ''
+        # Extract the article text and limit to 100 characters
+        article_body = soup.find('div', {'data-gu-name': 'body'})
+        if article_body:
+            article_text = article_body.find_all('p')[0].text.strip()[:200]
+        else:
+            article_text = 'N/a'
+
+            # # Parse the category from the url
+            #
+            # category = None
+            # path = urlparse(url).path
+            # path_parts = path.split('/')
+            # for term in path_parts:
+            #     if term in category_mapping:
+            #         category_text = category_mapping[term]
+            #         category = Category.ob
+
+        # Extract the article link, author, and site
+        link = f'<a href="{url}">{url}</a>'
+        author_element = soup.find('a', {'rel': 'author'})
+        author = author_element.text.strip() if author_element else 'N/a'
+        site = 'The Guardian'
 
     # Construct the output string
     output_string = f'<h3>{title}</h3> {image_tag} <p> {article_text}... </p> <br> <p> Link: {link} </p> <p> Author: {author} </p> <p> Site: {site} </p>'
 
-    # Parse the category from the url
+    # A dictionary to map terms to categories
+    category_mapping = {
+        'us-news': 'News',
+        'world': 'News',
+        'football': 'Sport',
+        'lifeandstyle': 'Culture',
+        'commentisfree': 'Opinion',
+        'film': 'Entertainment',
+        'tv-and-radio': 'Entertainment',
+        'music': 'Culture',
+        'science': 'Science',
+        'christian-aid-today': 'Opinion',
+    }
+
+
     path = urlparse(url).path
     categories = list(Category.objects.order_by('date_added'))
     # Convert category text to lowercase before comparison
-    category = next((cat for cat in categories if cat.text.lower() in path and cat.text.lower() != 'news'),
+    category_text = next((cat for cat in categories if cat.text.lower() in path and cat.text.lower() != 'news'),
                     None)
+
+    # Check if a category with the same name already exists
+    existing_category = None
+    if category_text:
+        existing_category = next((cat for cat in categories if cat.text.lower() == category_text), None)
+
     # If a Category object does not exist, create one using the actual path
-    if not category:
-        new_category = path.split('/')[2]  # Extract the third part of the path as the category
-        category = Category.objects.create(text=new_category)
+    if not existing_category:
+        path_parts = path.split('/')
+        new_category = path_parts[1]  # Extract the third part of the path as the category
+        if new_category in category_mapping:
+            category_text = category_mapping[new_category]
+        else:
+            category_text = new_category
+
+        # Create a new category object if it doesn't exist yet
+        category, created = Category.objects.get_or_create(text=category_text)
+    else:
+        # Use the existing category object
+        category = existing_category
 
     # Create an Article object with the category and article text
     article = Article.objects.create(
