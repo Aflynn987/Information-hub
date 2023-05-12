@@ -2,13 +2,13 @@
 
 {% block content %}
 
-  <p>Categories</p>
+  <h2 style="color: #343a40;">Categories</h2>
 
-  <div>
+  <div style="display: flex; flex-wrap: wrap;">
     {% for category in categories %}
-      <a style="display: block; background-color: lightgrey; border-radius: 5px;
-       margin: 10px; padding: 10px; text-align: center; width: 200px;
-        color: black; text-decoration: none;"
+      <a style="background-color: #343a40; border-radius: 5px; margin: 10px;
+       padding: 10px; text-align: center; width: 200px; color: white;
+       text-decoration: none;"
          href="{% url 'info_hubs:category' category.id %}">
         {{ category }}
       </a>
