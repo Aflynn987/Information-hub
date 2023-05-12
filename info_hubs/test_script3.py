@@ -96,3 +96,37 @@
 # #     for url in urls[:2]:
 # #         # Make a GET request to the URL and store the response
 # #         print(url)
+
+urls = []
+
+domain_name = 'theguardian'
+for url in urls:
+    # Make a GET request to the URL and store the response
+    response = requests.get(url)
+
+    # Parse the HTML content of the response with BeautifulSoup
+    soup = BeautifulSoup(response.content, 'html.parser')
+
+    # Extract the article title
+    maincontent_div = None
+    if domain_name == 'rte':
+        maincontent_div = soup.find('div', {'id': 'maincontent'})
+    elif domain_name == 'theguardian':
+        data_titles = ['Headlines', 'Sport', 'Culture', 'Lifestyle', 'Opinion']
+        for title in data_titles:
+            maincontent_div = soup.find('div', {'data-title': title})
+            if maincontent_div:
+                break
+
+    # Gather the list of articles for the given category
+    links = maincontent_div.find_all('a')
+    urls = []
+    for link in links:
+        href = link.get('href')
+        full_url = urljoin(url, href)
+        if full_url not in urls:
+            urls.append(full_url)
+
+    for url in urls[:2]:
+        # Make a GET request to the URL and store the response
+        print(url)
