@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     # Modules
     'requests',
     'tldextract',
+    'coverage',
 
     # My apps
     'info_hubs',
