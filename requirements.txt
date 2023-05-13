@@ -3,3 +3,6 @@ beautifulsoup4==4.10.0
 django==4.2.1
 django-bootstrap3==23.1
 tldextract==3.4.1
+requests_mock==1.10.0
+pytest==7.3.1 # This may not be needed, check with a fresh venv to make sure
+pytest-cov==4.0.0

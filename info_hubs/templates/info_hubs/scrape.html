@@ -2,8 +2,6 @@
 
 {% block content %}
 
-  <p>Scraping page</p>
-  <hr>
   <h1>Scrape</h1>
   <form method="post" action="{% url 'info_hubs:scrape_data' %}">
     {% csrf_token %}

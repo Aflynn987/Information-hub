@@ -47,10 +47,15 @@ def category(request, category_id):
 def scrape_data(request):
     if request.method == 'POST':
         # URL of the news article to scrape
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+                          ' AppleWebKit/537.36 (KHTML, like Gecko)'
+                          ' Chrome/58.0.3029.110 Safari/537.36'
+        }
         url = request.POST.get('url')
         domain_name = tldextract.extract(url).domain
 
-        response = requests.get(url)
+        response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
 
         if domain_name == 'rte':
@@ -60,17 +65,26 @@ def scrape_data(request):
             maincontent_div = soup.find('ul', {'class': 'pillars'})
             cat_params = ['international', 'commentisfree', 'sport', 'culture',
                           'lifeandstyle']  # The guardian cat_params aren't needed but the rte ones are
+        elif domain_name == 'theamericanconservative':
+            maincontent_div = soup.find('div', {'class': 'c-featured-posts__posts'})
 
         links = maincontent_div.find_all('a')
         urls = []
         for link in links:
             href = link.get('href')
             full_url = urljoin(url, href)
-            if full_url not in urls and any(cat in href.lower() for cat in cat_params):
-                urls.append(full_url)
+            if full_url not in urls and 'author' not in href:
+                if 'cat_params' in locals() and any(cat in href.lower() for cat in cat_params):
+                    urls.append(full_url)
+                elif 'cat_params' not in locals():
+                    urls.append(full_url)
 
-        for url in urls:
-            scrape_category(url, domain_name)
+        if domain_name != 'theamericanconservative':
+            for url in urls:
+                scrape_category(url, domain_name, headers)
+        else:
+            for url in urls:
+                scrape_article(url, domain_name, headers)
 
         # Return a success message
         return redirect(reverse('info_hubs:scrape_data') + '?' + urlencode({'success': 'true'}))
@@ -80,9 +94,9 @@ def scrape_data(request):
         context = {'success': success}
         return render(request, 'info_hubs/scrape.html', context=context)
 
-def scrape_category(url, domain_name):
+def scrape_category(url, domain_name, headers):
     # Make a GET request to the URL and store the response
-    response = requests.get(url)
+    response = requests.get(url, headers=headers)
 
     # Parse the HTML content of the response with BeautifulSoup
     soup = BeautifulSoup(response.content, 'html.parser')
@@ -114,12 +128,12 @@ def scrape_category(url, domain_name):
             if domain_name != domain_name_validation:
                 break
             # Make a GET request to the URL and store the response
-            scrape_article(url, domain_name)
+            scrape_article(url, domain_name, headers)
 
 
-def scrape_article(url, domain_name):
+def scrape_article(url, domain_name, headers):
     # Make a GET request to the URL and store the response
-    response = requests.get(url)
+    response = requests.get(url, headers=headers)
     # Parse the HTML content of the response with BeautifulSoup
     soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -134,7 +148,7 @@ def scrape_article(url, domain_name):
             image_tag = f'<a href="{image_url}"><img src="{image_url}" /></a>'
         else:
             image_tag = ''
-        # Extract the article text and limit to 100 characters
+        # Extract the article text and limit to 200 characters
         article_body = soup.find('section', class_='medium-10 medium-offset-1 columns article-body')
         if article_body:
             article_text = article_body.find_all('p')[0].text.strip()[:200]
@@ -170,21 +184,37 @@ def scrape_article(url, domain_name):
         else:
             article_text = 'N/a'
 
-            # # Parse the category from the url
-            #
-            # category = None
-            # path = urlparse(url).path
-            # path_parts = path.split('/')
-            # for term in path_parts:
-            #     if term in category_mapping:
-            #         category_text = category_mapping[term]
-            #         category = Category.ob
-
         # Extract the article link, author, and site
         link = f'<a href="{url}">{url}</a>'
         author_element = soup.find('a', {'rel': 'author'})
         author = author_element.text.strip() if author_element else 'N/a'
         site = 'The Guardian'
+
+    elif domain_name == 'theamericanconservative':
+        # Extract the article title
+        title = soup.find('h2', class_='c-hero-article__title s-medium').text.strip()
+        # title = soup.find('title').text.strip()
+
+
+        # Extract the article image URL (if one exists)
+        image = soup.find('div', class_='article_image')
+        if image:
+            image_url = image.find('img')['src']
+            image_tag = f'<a href="{image_url}"><img src="{image_url}" /></a>'
+        else:
+            image_tag = ''
+        # Extract the article text and limit to 100 characters
+        article_body = soup.find('section', {'class': 'c-blog-post__body'})
+        if article_body:
+            article_text = article_body.find_all('p')[0].text.strip()[:200]
+        else:
+            article_text = 'N/a'
+
+        # Extract the article link, author, and site
+        link = f'<a href="{url}">{url}</a>'
+        author_element = soup.find('a', {'class': 'o-byline__author'})
+        author = author_element.text.strip() if author_element else 'N/a'
+        site = 'The American Conservative'
 
     # Construct the output string
     output_string = f'<h3>{title}</h3> {image_tag} <p> {article_text}... </p> <br> <p> Link: {link} </p> <p> Author: {author} </p> <p> Site: {site} </p>'
@@ -203,12 +233,14 @@ def scrape_article(url, domain_name):
         'christian-aid-today': 'Opinion',
     }
 
-
     path = urlparse(url).path
     categories = list(Category.objects.order_by('date_added'))
     # Convert category text to lowercase before comparison
-    category_text = next((cat for cat in categories if cat.text.lower() in path and cat.text.lower() != 'news'),
-                    None)
+    if domain_name == 'theamericanconservative':
+        category_text = 'opinion'
+    else:
+        category_text = next((cat for cat in categories if cat.text.lower() in path and cat.text.lower()
+                              != 'news'), None)
 
     # Check if a category with the same name already exists
     existing_category = None
