@@ -148,118 +148,135 @@ def scrape_article(url, domain_name, headers):
     # Parse the HTML content of the response with BeautifulSoup
     soup = BeautifulSoup(response.content, 'html.parser')
 
-    title = 'N/a'
     if domain_name == 'rte':
-        # Extract the article title
-        title = soup.find('h1', class_='headline').text.strip()
-        # Extract the article image URL (if one exists)
-        image = soup.find('div', class_='article_image')
-        if image:
-            image_url = image.find('img')['src']
-            image_tag = f'<a href="{image_url}"><img src="{image_url}" /></a>'
-        else:
-            image_tag = ''
-        # Extract the article text and limit to 200 characters
-        article_body = soup.find('section', class_='medium-10 medium-offset-1 columns article-body')
-        if article_body:
-            article_text = article_body.find_all('p')[0].text.strip()[:200]
-        else:
-            article_text = 'N/a'
-
-        # Extract the article link, author, and site
-        link = f'<a href="{url}">{url}</a>'
-        author_element = soup.find('span', itemprop='name')
-        author = author_element.text.strip() if author_element else 'N/a'
-        site = 'RTE'
-
+        output_string = scrape_rte(url, soup)
     elif domain_name == 'theguardian':
-        # Extract the article title
-        # title = soup.find('div', {'data-gu-name': 'headline'}).find('h1').text.strip()
-        headline_div = soup.find('div', {'data-gu-name': 'headline'})
-        if headline_div:
-            title_element = headline_div.find('h1')
-            if title_element:
-                title = headline_div.find('h1').text.strip()
-
-        # Extract the article image URL (if one exists)
-        image = soup.find('div', class_='article_image')
-        if image:
-            image_url = image.find('img')['src']
-            image_tag = f'<a href="{image_url}"><img src="{image_url}" /></a>'
-        else:
-            image_tag = ''
-        # Extract the article text and limit to 100 characters
-        article_body = soup.find('div', {'data-gu-name': 'body'})
-        if article_body:
-            article_text = article_body.find_all('p')[0].text.strip()[:200]
-        else:
-            article_text = 'N/a'
-
-        # Extract the article link, author, and site
-        link = f'<a href="{url}">{url}</a>'
-        author_element = soup.find('a', {'rel': 'author'})
-        author = author_element.text.strip() if author_element else 'N/a'
-        site = 'The Guardian'
-
+        output_string = scrape_guardian(url, soup)
     elif domain_name == 'theamericanconservative':
-        # Extract the article title
-        title = soup.find('h2', class_='c-hero-article__title s-medium').text.strip()
-        # title = soup.find('title').text.strip()
-
-
-        # Extract the article image URL (if one exists)
-        image = soup.find('div', class_='article_image')
-        if image:
-            image_url = image.find('img')['src']
-            image_tag = f'<a href="{image_url}"><img src="{image_url}" /></a>'
-        else:
-            image_tag = ''
-        # Extract the article text and limit to 100 characters
-        article_body = soup.find('section', {'class': 'c-blog-post__body'})
-        if article_body:
-            article_text = article_body.find_all('p')[0].text.strip()[:200]
-        else:
-            article_text = 'N/a'
-
-        # Extract the article link, author, and site
-        link = f'<a href="{url}">{url}</a>'
-        author_element = soup.find('a', {'class': 'o-byline__author'})
-        author = author_element.text.strip() if author_element else 'N/a'
-        site = 'The American Conservative'
-
+        output_string = scrape_ac(url, soup)
     elif domain_name == 'dailykos':
-        # Extract the article title
-        title = soup.find('div', class_='story-title').text.strip()
-        # title = soup.find('title').text.strip()
+        output_string = scrape_kos(url, soup)
 
+    category = parse_category(url, domain_name)
 
-        # Extract the article image URL (if one exists)
-        image = soup.find('div', class_='article_image')
-        if image:
-            image_url = image.find('img')['src']
-            image_tag = f'<a href="{image_url}"><img src="{image_url}" /></a>'
-        else:
-            image_tag = ''
-        # Extract the article text and limit to 200 characters
-        article_body = soup.find('div', class_='story-column')
-        if article_body:
-            article_text = article_body.find_all('p')[0].text.strip()[:200]
-        else:
-            article_text = 'N/a'
+    # Create an Article object with the category and article text
+    article = Article.objects.create(
+        category=category,
+        text=output_string
+    )
 
-        # Extract the article link, author, and site
-        link = f'<a href="{url}">{url}</a>'
-        # author_element = soup.find('span', class_='author-name')
-        author_element = soup.find('div', class_='author-byline')
-        author_str = author_element.text.strip() if author_element else 'N/a'
-        # Clean author variable
-        pattern = re.compile(r"\b(for|Daily|kos)\b", flags=re.IGNORECASE)
-        author = re.sub(pattern, "", str(author_str)).strip()
-        site = 'The Daily Kos'
+    # Save the article instance to the database
+    article.save()
 
+def scrape_rte(url, soup):
+    # Extract the article title
+    title_element = soup.find('h1', class_='headline')
+    title = title_element.text.strip() if title_element else 'N/a'
+    # Extract the article image URL (if one exists)
+    image = soup.find('div', class_='article_image')
+    if image:
+        image_url = image.find('img')['src']
+        image_tag = f'<a href="{image_url}"><img src="{image_url}" /></a>'
+    else:
+        image_tag = ''
+    # Extract the article text and limit to 200 characters
+    article_body = soup.find('section', class_='medium-10 medium-offset-1 columns article-body')
+    if article_body:
+        article_text = article_body.find_all('p')[0].text.strip()[:200]
+    else:
+        article_text = 'N/a'
+
+    # Extract the article link, author, and site
+    link = f'<a href="{url}">{url}</a>'
+    author_element = soup.find('span', itemprop='name')
+    author = author_element.text.strip() if author_element else 'N/a'
+    site = 'RTE'
+    output_string = f'<h3>{title}</h3> {image_tag} <p> {article_text}... </p> <br> <p> Link: {link} </p> <p> Author: {author} </p> <p> Site: {site} </p>'
+    return output_string
+def scrape_guardian(url, soup):
+    title_element = soup.find('div', {'data-gu-name': 'headline'})
+    title = title_element.text.strip() if title_element else 'N/a'
+
+    # Extract the article image URL (if one exists)
+    image = soup.find('div', class_='article_image')
+    if image:
+        image_url = image.find('img')['src']
+        image_tag = f'<a href="{image_url}"><img src="{image_url}" /></a>'
+    else:
+        image_tag = ''
+    # Extract the article text and limit to 100 characters
+    article_body = soup.find('div', {'data-gu-name': 'body'})
+    if article_body:
+        article_text = article_body.find_all('p')[0].text.strip()[:200]
+    else:
+        article_text = 'N/a'
+
+    # Extract the article link, author, and site
+    link = f'<a href="{url}">{url}</a>'
+    author_element = soup.find('a', {'rel': 'author'})
+    author = author_element.text.strip() if author_element else 'N/a'
+    site = 'The Guardian'
+    output_string = f'<h3>{title}</h3> {image_tag} <p> {article_text}... </p> <br> <p> Link: {link} </p> <p> Author: {author} </p> <p> Site: {site} </p>'
+    return output_string
+def scrape_ac(url, soup):
+    # Extract the article title
+    title_element = soup.find('h2', class_='c-hero-article__title s-medium')
+    title = title_element.text.strip() if title_element else 'N/a'
+
+    # Extract the article image URL (if one exists)
+    image = soup.find('div', class_='article_image')
+    if image:
+        image_url = image.find('img')['src']
+        image_tag = f'<a href="{image_url}"><img src="{image_url}" /></a>'
+    else:
+        image_tag = ''
+    # Extract the article text and limit to 100 characters
+    article_body = soup.find('section', {'class': 'c-blog-post__body'})
+    if article_body:
+        article_text = article_body.find_all('p')[0].text.strip()[:200]
+    else:
+        article_text = 'N/a'
+
+    # Extract the article link, author, and site
+    link = f'<a href="{url}">{url}</a>'
+    author_element = soup.find('a', {'class': 'o-byline__author'})
+    author = author_element.text.strip() if author_element else 'N/a'
+    site = 'The American Conservative'
+    output_string = f'<h3>{title}</h3> {image_tag} <p> {article_text}... </p> <br> <p> Link: {link} </p> <p> Author: {author} </p> <p> Site: {site} </p>'
+    return output_string
+def scrape_kos(url, soup):
+    # Extract the article title
+    title_element = soup.find('div', class_='story-title')
+    title = title_element.text.strip() if title_element else 'N/a'
+
+    # Extract the article image URL (if one exists)
+    image = soup.find('div', class_='article_image')
+    if image:
+        image_url = image.find('img')['src']
+        image_tag = f'<a href="{image_url}"><img src="{image_url}" /></a>'
+    else:
+        image_tag = ''
+    # Extract the article text and limit to 200 characters
+    article_body = soup.find('div', class_='story-column')
+    if article_body:
+        article_text = article_body.find_all('p')[0].text.strip()[:200]
+    else:
+        article_text = 'N/a'
+
+    # Extract the article link, author, and site
+    link = f'<a href="{url}">{url}</a>'
+    # author_element = soup.find('span', class_='author-name')
+    author_element = soup.find('div', class_='author-byline')
+    author_str = author_element.text.strip() if author_element else 'N/a'
+    # Clean author variable
+    pattern = re.compile(r"\b(for|Daily|kos)\b", flags=re.IGNORECASE)
+    author = re.sub(pattern, "", author_str).strip()
+    site = 'The Daily Kos'
     # Construct the output string
     output_string = f'<h3>{title}</h3> {image_tag} <p> {article_text}... </p> <br> <p> Link: {link} </p> <p> Author: {author} </p> <p> Site: {site} </p>'
+    return output_string
 
+def parse_category(url, domain_name):
     # A dictionary to map terms to categories
     category_mapping = {
         'us-news': 'News',
@@ -305,11 +322,4 @@ def scrape_article(url, domain_name, headers):
         # Use the existing category object
         category = existing_category
 
-    # Create an Article object with the category and article text
-    article = Article.objects.create(
-        category=category,
-        text=output_string
-    )
-
-    # Save the article instance to the database
-    article.save()
+    return category
