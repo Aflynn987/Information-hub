@@ -3,6 +3,7 @@ from django.http import HttpResponse
 from django.urls import reverse
 from urllib.parse import urlparse, urlencode
 import requests
+import re
 from django.shortcuts import render
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
@@ -67,19 +68,29 @@ def scrape_data(request):
                           'lifeandstyle']  # The guardian cat_params aren't needed but the rte ones are
         elif domain_name == 'theamericanconservative':
             maincontent_div = soup.find('div', {'class': 'c-featured-posts__posts'})
+        elif domain_name == 'dailykos':
+            maincontent_div = [soup.find('div', {'class': 'top-news__primary_news'}),
+                               soup.find('div', {'class': 'top-news__secondary_news'}),
+                               soup.find('div', {'class': 'top-news__more_news'})]
 
-        links = maincontent_div.find_all('a')
+        links = []
+        if isinstance(maincontent_div, list):
+            for div in maincontent_div:
+                links += div.find_all('a')
+        else:
+            links = maincontent_div.find_all('a')
+
         urls = []
         for link in links:
             href = link.get('href')
             full_url = urljoin(url, href)
-            if full_url not in urls and 'author' not in href:
+            if full_url not in urls and 'author' or 'Cartoon' not in href:
                 if 'cat_params' in locals() and any(cat in href.lower() for cat in cat_params):
                     urls.append(full_url)
                 elif 'cat_params' not in locals():
                     urls.append(full_url)
 
-        if domain_name != 'theamericanconservative':
+        if domain_name != 'theamericanconservative' or 'dailykos':
             for url in urls:
                 scrape_category(url, domain_name, headers)
         else:
@@ -216,6 +227,36 @@ def scrape_article(url, domain_name, headers):
         author = author_element.text.strip() if author_element else 'N/a'
         site = 'The American Conservative'
 
+    elif domain_name == 'dailykos':
+        # Extract the article title
+        title = soup.find('div', class_='story-title').text.strip()
+        # title = soup.find('title').text.strip()
+
+
+        # Extract the article image URL (if one exists)
+        image = soup.find('div', class_='article_image')
+        if image:
+            image_url = image.find('img')['src']
+            image_tag = f'<a href="{image_url}"><img src="{image_url}" /></a>'
+        else:
+            image_tag = ''
+        # Extract the article text and limit to 200 characters
+        article_body = soup.find('div', class_='story-column')
+        if article_body:
+            article_text = article_body.find_all('p')[0].text.strip()[:200]
+        else:
+            article_text = 'N/a'
+
+        # Extract the article link, author, and site
+        link = f'<a href="{url}">{url}</a>'
+        # author_element = soup.find('span', class_='author-name')
+        author_element = soup.find('div', class_='author-byline')
+        author_str = author_element.text.strip() if author_element else 'N/a'
+        # Clean author variable
+        pattern = re.compile(r"\b(for|Daily|kos)\b", flags=re.IGNORECASE)
+        author = re.sub(pattern, "", str(author_str)).strip()
+        site = 'The Daily Kos'
+
     # Construct the output string
     output_string = f'<h3>{title}</h3> {image_tag} <p> {article_text}... </p> <br> <p> Link: {link} </p> <p> Author: {author} </p> <p> Site: {site} </p>'
 
@@ -238,6 +279,8 @@ def scrape_article(url, domain_name, headers):
     # Convert category text to lowercase before comparison
     if domain_name == 'theamericanconservative':
         category_text = 'opinion'
+    elif domain_name == 'dailykos':
+        category_text = 'news'
     else:
         category_text = next((cat for cat in categories if cat.text.lower() in path and cat.text.lower()
                               != 'news'), None)

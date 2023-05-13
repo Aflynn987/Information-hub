@@ -81,7 +81,7 @@ headers = {
                   ' AppleWebKit/537.36 (KHTML, like Gecko)'
                   ' Chrome/58.0.3029.110 Safari/537.36'
 }
-url = 'https://www.theamericanconservative.com'
+url = 'https://www.dailykos.com/'
 domain_name = tldextract.extract(url).domain
 
 response = requests.get(url, headers=headers)
@@ -96,21 +96,40 @@ elif domain_name == 'theguardian':
                   'lifeandstyle']  # The guardian cat_params aren't needed but the rte ones are
 elif domain_name == 'theamericanconservative':
     maincontent_div = soup.find('div', {'class': 'c-featured-posts__posts'})
+elif domain_name == 'dailykos':
+    maincontent_div = [soup.find('div', {'class': 'top-news__primary_news'}),
+                       soup.find('div', {'class': 'top-news__secondary_news'}),
+                       soup.find('div', {'class': 'top-news__more_news'})]
 
-links = maincontent_div.find_all('a')
+# links = []
+# if isinstance(maincontent_div, list):
+#     for div in maincontent_div:
+#         x = di
+#         links.append(x)
+# else:
+#     links = maincontent_div.find_all('a')
+
+links = []
+if isinstance(maincontent_div, list):
+    for div in maincontent_div:
+        links += div.find_all('a')
+else:
+    links = maincontent_div.find_all('a')
+
 urls = []
 for link in links:
     href = link.get('href')
     full_url = urljoin(url, href)
-    if full_url not in urls and 'author' not in href:
+    if full_url not in urls and 'author' and 'Cartoon' not in href:
         if 'cat_params' in locals() and any(cat in href.lower() for cat in cat_params):
             urls.append(full_url)
         elif 'cat_params' not in locals():
             urls.append(full_url)
+print(urls)
 
-if domain_name != 'theamericanconservative':
-    for url in urls:
-        print(url, domain_name, headers)
-else:
-    for url in urls:
-        print(url)
+# if domain_name != 'dailykos':
+#     for url in urls:
+#         print(url, domain_name, headers)
+# else:
+#     for url in urls:
+#         print(url)
