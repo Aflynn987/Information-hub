@@ -21,8 +21,6 @@ workflows:
               branches:
                 only:
                   - main
-            requires:
-              - test
 
 
 jobs:
