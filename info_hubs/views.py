@@ -10,13 +10,22 @@ from urllib.parse import urljoin
 import tldextract
 from .models import Article, Category
 
+## pytorch imports
+import re
+import string
+import nltk
+import torch
+from nltk.tokenize import sent_tokenize
+from transformers import pipeline, AutoModelForSeq2SeqLM, AutoTokenizer
 
 from .models import Category
+
 
 # Create your views here.
 def index(request):
     """The home page for information hub"""
     return render(request, 'info_hubs/index.html')
+
 
 def categories(request):
     """Show all categories"""
@@ -41,9 +50,9 @@ def category(request, category_id):
             article.image = image['href']
             article.text = str(soup).replace(str(image), '')
 
-
     context = {'category': category, 'articles': articles}
     return render(request, 'info_hubs/category.html', context)
+
 
 def scrape_data(request):
     if request.method == 'POST':
@@ -104,6 +113,7 @@ def scrape_data(request):
         success = request.GET.get('success')
         context = {'success': success}
         return render(request, 'info_hubs/scrape.html', context=context)
+
 
 def scrape_category(url, domain_name, headers):
     # Make a GET request to the URL and store the response
@@ -168,6 +178,7 @@ def scrape_article(url, domain_name, headers):
     # Save the article instance to the database
     article.save()
 
+
 def scrape_rte(url, soup):
     # Extract the article title
     title_element = soup.find('h1', class_='headline')
@@ -182,7 +193,8 @@ def scrape_rte(url, soup):
     # Extract the article text and limit to 200 characters
     article_body = soup.find('section', class_='medium-10 medium-offset-1 columns article-body')
     if article_body:
-        article_text = article_body.find_all('p')[0].text.strip()[:200]
+        article = article_body.find_all('p')[0].text.strip()[:200]
+        article_text = summarize(article)
     else:
         article_text = 'N/a'
 
@@ -193,6 +205,8 @@ def scrape_rte(url, soup):
     site = 'RTE'
     output_string = f'<h3>{title}</h3> {image_tag} <p> {article_text}... </p> <br> <p> Link: {link} </p> <p> Author: {author} </p> <p> Site: {site} </p>'
     return output_string
+
+
 def scrape_guardian(url, soup):
     title_element = soup.find('div', {'data-gu-name': 'headline'})
     title = title_element.text.strip() if title_element else 'N/a'
@@ -207,7 +221,8 @@ def scrape_guardian(url, soup):
     # Extract the article text and limit to 100 characters
     article_body = soup.find('div', {'data-gu-name': 'body'})
     if article_body:
-        article_text = article_body.find_all('p')[0].text.strip()[:200]
+        article = article_body.find_all('p')[0].text.strip()[:200]
+        article_text = summarize(article)
     else:
         article_text = 'N/a'
 
@@ -218,6 +233,8 @@ def scrape_guardian(url, soup):
     site = 'The Guardian'
     output_string = f'<h3>{title}</h3> {image_tag} <p> {article_text}... </p> <br> <p> Link: {link} </p> <p> Author: {author} </p> <p> Site: {site} </p>'
     return output_string
+
+
 def scrape_ac(url, soup):
     # Extract the article title
     title_element = soup.find('h2', class_='c-hero-article__title s-medium')
@@ -233,7 +250,8 @@ def scrape_ac(url, soup):
     # Extract the article text and limit to 100 characters
     article_body = soup.find('section', {'class': 'c-blog-post__body'})
     if article_body:
-        article_text = article_body.find_all('p')[0].text.strip()[:200]
+        article = article_body.find_all('p')[0].text.strip()[:200]
+        article_text = summarize(article)
     else:
         article_text = 'N/a'
 
@@ -244,6 +262,8 @@ def scrape_ac(url, soup):
     site = 'The American Conservative'
     output_string = f'<h3>{title}</h3> {image_tag} <p> {article_text}... </p> <br> <p> Link: {link} </p> <p> Author: {author} </p> <p> Site: {site} </p>'
     return output_string
+
+
 def scrape_kos(url, soup):
     # Extract the article title
     title_element = soup.find('div', class_='story-title')
@@ -259,7 +279,8 @@ def scrape_kos(url, soup):
     # Extract the article text and limit to 200 characters
     article_body = soup.find('div', class_='story-column')
     if article_body:
-        article_text = article_body.find_all('p')[0].text.strip()[:200]
+        article = article_body.find_all('p')[0].text.strip()[:200]
+        article_text = summarize(article)
     else:
         article_text = 'N/a'
 
@@ -275,6 +296,7 @@ def scrape_kos(url, soup):
     # Construct the output string
     output_string = f'<h3>{title}</h3> {image_tag} <p> {article_text}... </p> <br> <p> Link: {link} </p> <p> Author: {author} </p> <p> Site: {site} </p>'
     return output_string
+
 
 def parse_category(url, domain_name):
     # A dictionary to map terms to categories
@@ -323,3 +345,69 @@ def parse_category(url, domain_name):
         category = existing_category
 
     return category
+
+
+def preprocess(article):
+    # Remove URLs
+    text = re.sub(r'http\S+', '', text)
+    # Remove digits
+    text = re.sub(r'\d+', '', text)
+    # Remove punctuation
+    text = text.translate(str.maketrans('', '', string.punctuation))
+    # Tokenize sentences
+    sentences = sent_tokenize(text)
+    # Remove short sentences
+    sentences = [s for s in sentences if len(s) > 20]
+    return sentences
+
+    # Define postprocessing function
+
+
+def postprocess(article):
+    # Remove leading/trailing whitespace
+    summary = summary.strip()
+    # Capitalize first letter
+    summary = summary[0].upper() + summary[1:]
+    # Add period if missing
+    if summary[-1] not in ['.', '!', '?']:
+        summary += '.'
+    return summary
+
+
+def summarize(article):
+    model_name = "sshleifer/distilbart-cnn-12-6"
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    summarizer = pipeline(
+        "summarization",
+        model=model,
+        tokenizer=tokenizer,
+        framework="pt",
+        device=device,
+        max_length=190,
+        min_length=100,
+        num_beams=4,
+        length_penalty=2.0,
+        early_stopping=True,
+        no_repeat_ngram_size=2,
+        num_return_sequences=1,
+        top_p=0.92,
+        top_k=40,
+        temperature=0.8
+    )
+
+    # Preprocess text
+    sentences = preprocess(text)
+
+    # Generate summaries for each sentence
+    summaries = []
+    for sentence in sentences:
+        summary_text = summarizer(sentence)[0]['summary_text']
+        summary = postprocess(summary_text)
+        summaries.append(summary)
+
+    # Join summaries into a single text
+    summary_text = ' '.join(summaries)
+
+    return summary
