@@ -7,7 +7,9 @@ cd Information-hub/
 # Create a venv and activate it
 virtualenv venv
 source venv/bin/activate
+# Manually install Django
 # Install requirements
 pip install -r requirements.txt
+pip install Django
 # Start the server
 python3 manage.py runserver 0:3000
