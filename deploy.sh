@@ -11,5 +11,6 @@ source venv/bin/activate
 # Install requirements
 pip install -r requirements.txt
 pip install Django
+pip install django-bootstrap3
 # Start the server
 python3 manage.py runserver 0:3000
