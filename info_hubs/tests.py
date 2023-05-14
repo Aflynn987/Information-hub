@@ -1,13 +1,11 @@
 from django.test import TestCase, Client
 from django.urls import reverse
-from info_hubs.models import Category, Article
+from info_hubs.models import  Article
 from bs4 import BeautifulSoup
-import unittest
-import requests_mock
-from unittest.mock import patch, call
-from urllib.parse import urljoin
+from unittest.mock import patch, MagicMock
+from info_hubs.models import Category
 
-from .views import scrape_category, summarize, preprocess, postprocess
+from .views import summarize, preprocess, parse_category
 
 
 # Tests for info_hubs models
@@ -108,3 +106,35 @@ class TestPytorch(TestCase):
             )
             self.assertIsNotNone(postprocessed_summary)
 
+
+
+class ParseCategoryTestCase(TestCase):
+    def setUp(self):
+        # Create some Category objects for testing
+        Category.objects.create(text='News')
+        Category.objects.create(text='Opinion')
+        Category.objects.create(text='Culture')
+        Category.objects.create(text='Science')
+
+    @patch('info_hubs.models.Category.objects.order_by')
+    def test_parse_category(self, mock_order_by):
+        # Mock the Category.objects.order_by method to return a known list of categories
+        mock_order_by.return_value = [
+            MagicMock(text='News'),
+            MagicMock(text='Opinion'),
+            MagicMock(text='Culture'),
+            MagicMock(text='Science'),
+        ]
+
+        # Test the function with various input URLs and domain names
+        self.assertEqual(parse_category('http://www.example.com/us-news/1234', 'example'), Category.objects.get(text='News'))
+        self.assertEqual(parse_category('http://www.example.com/world/5678', 'example'), Category.objects.get(text='News'))
+        self.assertEqual(parse_category('http://www.example.com/football/1234', 'example'), Category.objects.get(text='Sport'))
+        self.assertEqual(parse_category('http://www.example.com/lifeandstyle/5678', 'example'), Category.objects.get(text='Culture'))
+        self.assertEqual(parse_category('http://www.example.com/commentisfree/1234', 'example'), Category.objects.get(text='Opinion'))
+        self.assertEqual(parse_category('http://www.example.com/film/5678', 'example'), Category.objects.get(text='Entertainment'))
+        self.assertEqual(parse_category('http://www.example.com/tv-and-radio/1234', 'example'), Category.objects.get(text='Entertainment'))
+        self.assertEqual(parse_category('http://www.example.com/music/5678', 'example'), Category.objects.get(text='Culture'))
+
+        # Test the function with a path that doesn't match any categories
+        self.assertEqual(parse_category('http://www.example.com/unknown-category/1234', 'example.com').text, 'unknown-category')
