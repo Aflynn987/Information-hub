@@ -22,7 +22,7 @@ workflows:
                 only:
                   - main
             requires:
-              - build
+              - test
 
 
 jobs:
