@@ -17,9 +17,6 @@ import nltk
 import torch
 from nltk.tokenize import sent_tokenize
 from transformers import pipeline, AutoModelForSeq2SeqLM, AutoTokenizer
-
-from .models import Category
-
 nltk.download('punkt')
 device = 0 if torch.cuda.is_available() else -1
 
@@ -133,9 +130,6 @@ def scrape_category(url, domain_name, headers):
         data_titles = ['Headlines', 'Sport', 'Culture', 'Lifestyle', 'Opinion']
         for title in data_titles:
             maincontent_div = soup.find('div', {'data-title': title})
-            if maincontent_div:
-                # category = 'News' if title == 'Headlines' else title
-                break
 
     # Gather the list of articles for the given category
     if maincontent_div:
@@ -318,19 +312,24 @@ def parse_category(url, domain_name):
 
     path = urlparse(url).path
     categories = list(Category.objects.order_by('date_added'))
+
+    # Convert all categories to lowercase
+    for cat in categories:
+        cat.text = cat.text.lower()
+
     # Convert category text to lowercase before comparison
     if domain_name == 'theamericanconservative':
         category_text = 'opinion'
     elif domain_name == 'dailykos':
         category_text = 'news'
     else:
-        category_text = next((cat for cat in categories if cat.text.lower() in path and cat.text.lower()
-                              != 'news'), None)
+        category_text = next((cat.text for cat in categories if cat.text in path.lower() and cat.text != 'news'), None)
 
     # Check if a category with the same name already exists
     existing_category = None
     if category_text:
-        existing_category = next((cat for cat in categories if cat.text.lower() == category_text), None)
+        # Match categories regardless of case sensitivity
+        existing_category = next((cat for cat in categories if cat.text == category_text.lower()), None)
 
     # If a Category object does not exist, create one using the actual path
     if not existing_category:

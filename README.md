@@ -1,5 +1,5 @@
 # Information-hub
-Django based news crration platform
+Django based news curration platform
 
 ### Installation
 To run the application locally, you will first need to run the following comamnds to install a virtual environment to load the requirements
