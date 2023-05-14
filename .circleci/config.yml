@@ -9,23 +9,75 @@ workflows:
               branches:
                 only:
                   - main
+        - test:
+            filters:
+              branches:
+                only:
+                  - main
+            requires:
+              - build
+        - deploy:
+            filters:
+              branches:
+                only:
+                  - main
+            requires:
+              - test
+
 
 jobs:
   build:
     working_directory: ~/Information-hub
     docker:
-      - image: circleci/node:10.16.3
+      - image: circleci/python:3.9.6-buster
     steps:
       - checkout
       - run:
-          name: update-npm
-          command: 'sudo npm install -g npm@5'
-      - restore_cache:
-          key: dependency-cache-{{ checksum "package-lock.json" }}
+          name: update-pip
+          command: |
+            sudo apt-get update && \
+            sudo apt-get install -y python3-pip && \
+            sudo pip3 install --upgrade pip
       - run:
-          name: install-npm
-          command: npm install
+          name: install-virtualenv
+          command: sudo pip3 install virtualenv
+      - restore_cache:
+          key: dependency-cache-{{ checksum "requirements.txt" }}
+      - run:
+          name: install-dependencies
+          command: |
+            virtualenv venv
+            . venv/bin/activate
+            pip install -r requirements.txt
       - save_cache:
-          key: dependency-cache-{{ checksum "package-lock.json" }}
+          key: dependency-cache-{{ checksum "requirements.txt" }}
           paths:
-            - ./node_mdodules
+            - ./venv
+
+  test:
+    working_directory: ~/Information-hub
+    docker:
+      - image: circleci/python:3.9.6-buster
+    steps:
+      - checkout
+      - restore_cache:
+          key: dependency-cache-{{ checksum "requirements.txt" }}
+      - run:
+          name: run-tests
+          command: |
+            . venv/bin/activate
+            coverage run manage.py test
+            coverage report
+
+      - save_cache:
+          key: dependency-cache-{{ checksum "requirements.txt" }}
+          paths:
+            - ./venv
+
+  deploy:
+    docker:
+      - image: circleci/node:10.16.3
+    steps:
+      - run:
+          name: deploy-application
+          command: ssh -o StrictHostKeyChecking=no $EC2_USERNAME@EC2_PUBLIC_DNS "rm -rf Information-hub;git clone https://github.com/Aflynn987/Information-hub.git; source Information-hub/deploy.sh"
