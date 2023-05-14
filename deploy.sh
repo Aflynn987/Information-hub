@@ -9,8 +9,18 @@ virtualenv venv
 source venv/bin/activate
 # Manually install Django
 # Install requirements
-pip install -r requirements.txt
 pip install Django
 pip install django-bootstrap3
+pip install tldextract
+pip install nltk
+pip install requests
+pip install beautifulsoup4
+pip install requests_mock
+pip install pytest
+pip install pytest-cov
+pip install tokenizers
+pip install transformers
+pip install pytorch-lightning
+pip install nltk
 # Start the server
 python3 manage.py runserver 0:3000
