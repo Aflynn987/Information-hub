@@ -23,6 +23,7 @@ from .models import Category
 nltk.download('punkt')
 device = 0 if torch.cuda.is_available() else -1
 
+
 # Create your views here.
 def index(request):
     """The home page for information hub"""
@@ -349,31 +350,30 @@ def parse_category(url, domain_name):
     return category
 
 
+def preprocess(article):
+    # Remove URLs
+    article = re.sub(r'http\S+', '', article)
+    # Remove digits
+    article = re.sub(r'\d+', '', article)
+    # Remove punctuation
+    article = article.translate(str.maketrans('', '', string.punctuation))
+    # Tokenize sentences
+    sentences = sent_tokenize(article)
+    # Remove short sentences
+    sentences = [s for s in sentences if len(s) > 20]
+    return sentences
+
+def postprocess(summary):
+    # Remove leading/trailing whitespace
+    summary = summary.strip()
+    # Capitalize first letter
+    summary = summary[0].upper() + summary[1:]
+    # Add period if missing
+    if summary[-1] not in ['.', '!', '?']:
+        summary += '.'
+    return summary
+
 def summarize(article):
-    def preprocess(article):
-        # Remove URLs
-        article = re.sub(r'http\S+', '', article)
-        # Remove digits
-        article = re.sub(r'\d+', '', article)
-        # Remove punctuation
-        article = article.translate(str.maketrans('', '', string.punctuation))
-        # Tokenize sentences
-        sentences = sent_tokenize(article)
-        # Remove short sentences
-        sentences = [s for s in sentences if len(s) > 20]
-        return sentences
-
-    # Define postprocessing function
-    def postprocess(summary):
-        # Remove leading/trailing whitespace
-        summary = summary.strip()
-        # Capitalize first letter
-        summary = summary[0].upper() + summary[1:]
-        # Add period if missing
-        if summary[-1] not in ['.', '!', '?']:
-            summary += '.'
-        return summary
-
     # Load model and tokenizer
     model_name = "t5-base"
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
@@ -397,10 +397,9 @@ def summarize(article):
 
     # Generate summaries for each sentence
     summaries = []
-    for sentence in sentences:
-        summary_text = summarizer(article)[0]['summary_text']
-        summary = postprocess(summary_text)
-        summaries.append(summary)
+    summary_text = summarizer(article)[0]['summary_text']
+    summary = postprocess(summary_text)
+    summaries.append(summary)
 
     # Join summaries into a single text
     summary_text = ' '.join(summaries)

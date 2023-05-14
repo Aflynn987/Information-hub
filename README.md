@@ -34,7 +34,7 @@ python manage.py test
 
 If you want to see the total test coverage from the tests instead, the commands are a bit different
 ```
-coverage manage.py test 
+coverage run manage.py test 
 coverage report
 ```
 you should then be able to see the coverage of each file within the project. 

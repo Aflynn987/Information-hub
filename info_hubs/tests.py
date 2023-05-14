@@ -7,7 +7,7 @@ import requests_mock
 from unittest.mock import patch, call
 from urllib.parse import urljoin
 
-from .views import scrape_category
+from .views import scrape_category, summarize, preprocess, postprocess
 
 
 # Tests for info_hubs models
@@ -83,28 +83,28 @@ class InfoHubViewsTestCase(TestCase):
         else:
             self.assertEqual(image['src'], '/media/image.jpg/')
 
+class TestPytorch(TestCase):
+    def test_summarize(self):
+        article = "This is a test article. It contains some text that we will summarize. The summary should be brief and capture the main points of the article."
+        expected_summary = "This is a test article. It contains some text that we will summarize."
+        with patch('info_hubs.views.summarize') as mock_summarize:
+            mock_summarize.return_value = expected_summary
+            summary = summarize(article)
+            self.assertIsNotNone(summary)
 
+    def test_preprocess(self):
+        article = "This is a test article. It contains some text that we will preprocess."
+        expected_sentences = ['This is a test article It contains some text that we will preprocess']
+        sentences = preprocess(article)
+        self.assertEqual(sentences, expected_sentences)
 
-# Tests for webscraping view method
-# class ScrapeDataViewTestCase(TestCase):
-#
-#     def setUp(self):
-#         self.client = Client()
-#         self.url = 'https://www.rte.ie/news/business/2023/0510/1382716-retailers/'
-#         self.response = self.client.post(reverse('info_hubs:scrape_data'), {'url': self.url})
-#
-#     def test_post_request_creates_article(self):
-#         article = Article.objects.get(category__text='Business')
-#         self.assertEqual(article.category.text, 'Business')
-#
-#     def test_post_request_redirects_to_success_page(self):
-#         self.assertEqual(self.response.status_code, 302)
-#         self.assertRedirects(self.response, f"{reverse('info_hubs:scrape_data')}?success=true")
-#
-#     def test_get_request_returns_scrape_template(self):
-#         response = self.client.get(reverse('info_hubs:scrape_data'))
-#         self.assertTemplateUsed(response, 'info_hubs/scrape.html')
-#
-#     def test_get_request_success_param(self):
-#         response = self.client.get(reverse('info_hubs:scrape_data'), {'success': 'true'})
-#         self.assertContains(response, 'Scraping complete!')
+    def test_postprocess(self):
+        summary = "this is a test summary. it should be postprocessed to capitalize the first letter and add a period."
+        with patch('info_hubs.views.postprocess') as mock_postprocess:
+            mock_postprocess.return_value = "This is a test summary."
+            postprocessed_summary = summarize(summary)
+            mock_postprocess.assert_called_once_with(
+                'this is a test summary . it should be postprocessed to capitalize the first letter and add period.'
+            )
+            self.assertIsNotNone(postprocessed_summary)
+

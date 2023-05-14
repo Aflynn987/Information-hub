@@ -16,13 +16,13 @@ workflows:
                   - main
             requires:
               - build
-#        - deploy:
-#            filters:
-#              branches:
-#                only:
-#                  - main
-#            requires:
-#              - test
+        - deploy:
+            filters:
+              branches:
+                only:
+                  - main
+            requires:
+              - test
 
 
 jobs:
@@ -74,10 +74,10 @@ jobs:
           paths:
             - ./venv
 
-#  deploy:
-#    docker:
-#      - image: circleci/node:10.16.3
-#    steps:
-#      - run:
-#          name: deploy-application
-#          command: ssh -o StrictHostKeyChecking=no $EC2_USERNAME@$EC2_PUBLIC_DNS "rm -rf Information-hub/;git clone https://github.com/Aflynn987/Information-hub.git; source Information-hub/deploy.sh"
+  deploy:
+    docker:
+      - image: circleci/node:10.16.3
+    steps:
+      - run:
+          name: deploy-application
+          command: ssh -o StrictHostKeyChecking=no $EC2_USERNAME@$EC2_PUBLIC_DNS "rm -rf Information-hub/;git clone https://github.com/Aflynn987/Information-hub.git; source Information-hub/deploy.sh"
