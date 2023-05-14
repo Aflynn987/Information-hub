@@ -10,4 +10,5 @@ pytest-cov==4.0.0
 tokenizers
 transformers
 pytorch-lightning
+torch
 nltk==3.8.1

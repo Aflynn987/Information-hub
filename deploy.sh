@@ -21,6 +21,7 @@ pip install pytest-cov
 pip install tokenizers
 pip install transformers
 pip install pytorch-lightning
+pip install torch
 pip install nltk
 # Start the server
 python3 manage.py runserver 0:3000
