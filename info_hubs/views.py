@@ -20,6 +20,8 @@ from transformers import pipeline, AutoModelForSeq2SeqLM, AutoTokenizer
 
 from .models import Category
 
+nltk.download('punkt')
+device = 0 if torch.cuda.is_available() else -1
 
 # Create your views here.
 def index(request):
@@ -193,7 +195,7 @@ def scrape_rte(url, soup):
     # Extract the article text and limit to 200 characters
     article_body = soup.find('section', class_='medium-10 medium-offset-1 columns article-body')
     if article_body:
-        article = article_body.find_all('p')[0].text.strip()[:200]
+        article = article_body.find_all('p')[0].text.strip()
         article_text = summarize(article)
     else:
         article_text = 'N/a'
@@ -221,7 +223,7 @@ def scrape_guardian(url, soup):
     # Extract the article text and limit to 100 characters
     article_body = soup.find('div', {'data-gu-name': 'body'})
     if article_body:
-        article = article_body.find_all('p')[0].text.strip()[:200]
+        article = article_body.find_all('p')[0].text.strip()
         article_text = summarize(article)
     else:
         article_text = 'N/a'
@@ -250,7 +252,7 @@ def scrape_ac(url, soup):
     # Extract the article text and limit to 100 characters
     article_body = soup.find('section', {'class': 'c-blog-post__body'})
     if article_body:
-        article = article_body.find_all('p')[0].text.strip()[:200]
+        article = article_body.find_all('p')[0].text.strip()
         article_text = summarize(article)
     else:
         article_text = 'N/a'
@@ -279,7 +281,7 @@ def scrape_kos(url, soup):
     # Extract the article text and limit to 200 characters
     article_body = soup.find('div', class_='story-column')
     if article_body:
-        article = article_body.find_all('p')[0].text.strip()[:200]
+        article = article_body.find_all('p')[0].text.strip()
         article_text = summarize(article)
     else:
         article_text = 'N/a'
@@ -347,67 +349,62 @@ def parse_category(url, domain_name):
     return category
 
 
-def preprocess(article):
-    # Remove URLs
-    text = re.sub(r'http\S+', '', text)
-    # Remove digits
-    text = re.sub(r'\d+', '', text)
-    # Remove punctuation
-    text = text.translate(str.maketrans('', '', string.punctuation))
-    # Tokenize sentences
-    sentences = sent_tokenize(text)
-    # Remove short sentences
-    sentences = [s for s in sentences if len(s) > 20]
-    return sentences
+def summarize(article):
+    def preprocess(article):
+        # Remove URLs
+        article = re.sub(r'http\S+', '', article)
+        # Remove digits
+        article = re.sub(r'\d+', '', article)
+        # Remove punctuation
+        article = article.translate(str.maketrans('', '', string.punctuation))
+        # Tokenize sentences
+        sentences = sent_tokenize(article)
+        # Remove short sentences
+        sentences = [s for s in sentences if len(s) > 20]
+        return sentences
 
     # Define postprocessing function
+    def postprocess(summary):
+        # Remove leading/trailing whitespace
+        summary = summary.strip()
+        # Capitalize first letter
+        summary = summary[0].upper() + summary[1:]
+        # Add period if missing
+        if summary[-1] not in ['.', '!', '?']:
+            summary += '.'
+        return summary
 
-
-def postprocess(article):
-    # Remove leading/trailing whitespace
-    summary = summary.strip()
-    # Capitalize first letter
-    summary = summary[0].upper() + summary[1:]
-    # Add period if missing
-    if summary[-1] not in ['.', '!', '?']:
-        summary += '.'
-    return summary
-
-
-def summarize(article):
-    model_name = "sshleifer/distilbart-cnn-12-6"
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
+    # Load model and tokenizer
+    model_name = "t5-base"
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
+    # Define summarization pipeline
     summarizer = pipeline(
         "summarization",
-        model=model,
-        tokenizer=tokenizer,
-        framework="pt",
-        device=device,
-        max_length=190,
-        min_length=100,
-        num_beams=4,
-        length_penalty=2.0,
-        early_stopping=True,
-        no_repeat_ngram_size=2,
+        model=model, tokenizer=tokenizer,
+        framework="tf", device=device,
+        max_length=50, min_length=24,
+        num_beams=4, length_penalty=2.0,
+        early_stopping=True, no_repeat_ngram_size=2,
         num_return_sequences=1,
-        top_p=0.92,
-        top_k=40,
-        temperature=0.8
+        top_p=0.92, top_k=40,
+        temperature=0.8,
     )
 
-    # Preprocess text
-    sentences = preprocess(text)
+    # Load text and preprocess
+    sentences = preprocess(article)
 
     # Generate summaries for each sentence
     summaries = []
     for sentence in sentences:
-        summary_text = summarizer(sentence)[0]['summary_text']
+        summary_text = summarizer(article)[0]['summary_text']
         summary = postprocess(summary_text)
         summaries.append(summary)
 
     # Join summaries into a single text
     summary_text = ' '.join(summaries)
 
-    return summary
+    # Print summary
+    print(summary_text)
+    return summary_text
